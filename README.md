@@ -7,6 +7,7 @@ For more examples, see `experiments`, in particular `experiments/ED Trauma.ipynb
 
 Basic Usage:
 ```
+python
 from coai import CoAIOptimizer
 import numpy as np
 import shap
