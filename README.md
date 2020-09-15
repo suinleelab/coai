@@ -6,8 +6,7 @@ To install, run `python setup.py install` from the main directory; `python setup
 For more examples, see `experiments`, in particular `experiments/ED Trauma.ipynb` and `experiments/NHANES.ipynb`.
 
 Basic Usage:
-```
-python
+```python
 from coai import CoAIOptimizer
 import numpy as np
 import shap
