@@ -30,9 +30,37 @@ def zerofeats(arr,feats):
         return a2
 
 class DynamicOptimizer(CostAwareOptimizer):
+    """
+    Makes cost-aware feature choices using a dynamic programming knapsack solver.
+    
+    Calculates feature importance on full model using the `explainer` input, and
+    maximizes sum of feature importances subject to a hard limit on total feature
+    cost. This corresponds exactly to a knapsack problem and can be solved 
+    efficiently so long as costs and importances have reasonable precision.
+    """
     def __init__(self, model, explainer, scale_ints=None):
+        """
+        Initialize with base model type and explainer type.
+        
+        Parameters
+        ----------
+        model : estimator
+            A instance of a model object that implements the Sklearn Estimator API,
+            e.g. fit and predict.
+            
+        explainer : explainer
+            An explainer class which will be instantiated multiple times
+            internally. Must be instantiated as explainer(model,data) and
+            calculate importances via explainer.shap_values(data). Most SHAP
+            explainer should fit this structure.
+            
+        scale_ints : int, default 100
+            Multiplicative amount by which to scale feature costs and importances
+            before knapsack optimization (inputs to the knapsack solver must be
+            integer-valued).
+        """
         super().__init__(model,explainer)
-        if scale_ints is None: scale_ints = 100
+        if scale_ints is None: scale_ints = 1000
         self.scale_ints = scale_ints
         self.thresholds = None
         self.global_importances = None
@@ -69,6 +97,38 @@ class DynamicOptimizer(CostAwareOptimizer):
             self.model_features.extend(tfeats)
             
     def fit(self,X,y,feature_costs=None,thresholds=None,cost_criterion=None,**kwargs):
+        """
+        Fit to data and feature costs.
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            A data matrix containing predictors. 
+            Compatibility with Pandas not yet guaranteed.
+            
+        y : np.ndarray
+            A vector containing labels.
+            
+        feature_costs : np.ndarray, default None
+            A vector of length X.shape[1], containing the numeric
+            cost associated with each feature.
+            
+            If None, set to equal costs (1) for each feature.
+        
+        thresholds : np.ndarray, default None
+            A vector of arbitrary length containing the cost budgets to fit
+            models at. While predictions can be made within any budget after
+            fitting, best performance occurs if the budget is in this array.
+            
+            If None, set to range from 0 to the sum of feature costs, with 
+            step size = min(feature_costs).
+            
+        cost_criterion : function
+            Deprecated.
+            
+        kwargs : dictionary
+            Keyword arguments passed to the base model fit function.
+        """
         if feature_costs is None:
             feature_costs = np.ones(X.shape[1])
         self.feature_costs = np.array(feature_costs)
@@ -81,6 +141,45 @@ class DynamicOptimizer(CostAwareOptimizer):
 
 class GroupOptimizer(DynamicOptimizer):
     def fit(self,X,y,feature_costs=None,feature_groups=None,thresholds=None,cost_criterion=None,**kwargs):
+        """
+        Fit to data and feature costs.
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            A data matrix containing predictors. 
+            Compatibility with Pandas not yet guaranteed.
+            
+        y : np.ndarray
+            A vector containing labels.
+            
+        feature_costs : np.ndarray, default None
+            A vector of length X.shape[1], containing the numeric
+            cost associated with each feature.
+            
+            If None, set to equal costs (1) for each feature.
+            
+        feature_groups : np.ndarray, default None
+            A vector of length X.shape[1] with dtype int. Each entry is the
+            group each feature belongs to; groups of features are acquired all
+            at once with a single cost.
+            
+            If None, set to distinct groups for every feature.
+        
+        thresholds : np.ndarray, default None
+            A vector of arbitrary length containing the cost budgets to fit
+            models at. While predictions can be made within any budget after
+            fitting, best performance occurs if the budget is in this array.
+            
+            If None, set to range from 0 to the sum of feature costs, with 
+            step size = min(feature_costs).
+            
+        cost_criterion : function
+            Deprecated.
+            
+        kwargs : dictionary
+            Keyword arguments passed to the base model fit function.
+        """
         if feature_groups is None:
             feature_groups = np.arange(X.shape[1])
         self.feature_groups = feature_groups
@@ -118,7 +217,8 @@ class GroupOptimizer(DynamicOptimizer):
         newcost = self.feats_costs(features)
         return (model, newcost, features)
 
-
+class CoAIOptimizer(GroupOptimizer):
+    pass
 
         
             

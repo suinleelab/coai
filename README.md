@@ -7,22 +7,36 @@ For more examples, see `experiments`, in particular `experiments/ED Trauma.ipynb
 
 Basic Usage:
 ```
-from coai import GreedyOptimizer
+from coai import CoAIOptimizer
 import numpy as np
 import shap
 import xgboost as xgb
 
+# Random data
 Xtrain = np.random.random((100,10))
 Xtest = np.random.random((100,10))
 ytrain = np.random.choice([0,1],size=100)
 ytest = np.random.choice([0,1],size=100)
 
-costs = np.arange(10)+1
-cost_threshold = 2.5
+# Features fall into two groups, each with a randmly assigned cost
+costs = np.hstack(([np.random.random()]*5,[np.random.random()]*5))
+groups = np.hstack(([1]*5,[2]*5))
 
+# Train models at three cost thresholds
+thresholds = np.array([0.5,1.25,1.75])
+
+# Base model and explainer
 bst = xgb.XGBClassifier(tree_method='approx',silent=1)
 explainer = shap.TreeExplainer
-GO = GreedyOptimizer(bst,explainer)
-GO.fit(Xtrain,ytrain,costs)
-GO.predict(Xtest,max_cost=cost_threshold)
+
+# Train CoAI
+CoAI = CoAIOptimizer(bst,explainer,scale_ints=10000)
+CoAI.fit(Xtrain,ytrain,
+    feature_costs=costs,
+    feature_groups=groups,
+    thresholds=thresholds)
+
+# Generate predictions with budget 1.25
+deployment_threshold=1.25
+preds = CAI.predict(Xtest,max_cost=deployment_threshold)
 ```
