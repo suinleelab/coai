@@ -38,5 +38,5 @@ CoAI.fit(Xtrain,ytrain,
 
 # Generate predictions with budget 1.25
 deployment_threshold=1.25
-preds = CAI.predict(Xtest,max_cost=deployment_threshold)
+preds = CoAI.predict(Xtest,max_cost=deployment_threshold)
 ```
