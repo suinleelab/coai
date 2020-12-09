@@ -1,7 +1,7 @@
 # CoAI
 
 Main package with tools to make any predictive model cost-aware.
-To install, run `python setup.py install` from the main directory; `python setup.py install --user` for local install.
+To install, run `python setup.py install` from the main directory; `python setup.py install --user` for local install. Installation should take only a few minutes.
 
 For more examples, see `experiments`, in particular `experiments/ED Trauma.ipynb` and `experiments/NHANES.ipynb`.
 
@@ -40,3 +40,15 @@ CoAI.fit(Xtrain,ytrain,
 deployment_threshold=1.25
 preds = CoAI.predict(Xtest,max_cost=deployment_threshold)
 ```
+
+## Dependencies (and versions known to work):
+* Python 3 (3.6)
+* Numpy (1.17.0)
+* Pandas (0.25.1)
+* Scikit-Learn (0.23)
+* SHAP (0.35.0)
+* LightGBM (2.3.0)
+* Matplotlib (3.1.1)
+* TQDM (4.49.0)
+
+CoAI should work on any operating system but has been tested so far on Ubuntu and CentOS.
