@@ -5,7 +5,6 @@ import lightgbm as lgb
 import sklearn
 from sklearn import impute
 from matplotlib import pyplot as plt
-import matplotlib_venn as venn
 from tqdm import tqdm as tqdm
 from collections import Counter, defaultdict
 import itertools, os
@@ -19,37 +18,60 @@ def load_bp():
     try: return np.load(BP_PATH,allow_pickle=True)
     except (OSError, FileNotFoundError): return generate_bp()
 
+def loadcsv(fname):
+    try:
+        return pd.read_csv(fname,low_memory=True,memory_map=True)
+    except (OSError ,FileNotFoundError) as e:
+        raise e#("eICU data not found! Data must be acquired separately and placed in the 'data/eicu' directory.")
+    
 def generate_bp():
     warnings.warn('Cached BP data not found, regenerating...')
     # Load data
-    try: 
-        apsvar = pd.read_csv("../data/eicu/apacheApsVar.csv")
-        results = pd.read_csv("../data/eicu/apachePatientResult.csv")
-        predvar = pd.read_csv("../data/eicu/apachePredVar.csv")
-        patients = pd.read_csv("../data/eicu/patient.csv")
-        hospitals = pd.read_csv("../data/eicu/hospital.csv")
-        vperiodic = pd.read_csv("../data/eicu/vitalPeriodic.csv")
-        nursecharting = pd.read_csv('../data/eicu/nurseCharting.csv')
-        physical = pd.read_csv('../data/eicu/physicalExam.csv')
-    except (OSError, FileNotFoundError) as e:
-        raise e("eICU data not found! Data must be acquired separately and placed in the 'data/eicu' directory.")
+#     try: 
+#         apsvar = pd.read_csv("../data/eicu/apacheApsVar.csv",low_memory=True,memory_map=True)
+#         results = pd.read_csv("../data/eicu/apachePatientResult.csv",low_memory=True,memory_map=True)
+#         patients = pd.read_csv("../data/eicu/patient.csv",low_memory=True,memory_map=True)
+#         hospitals = pd.read_csv("../data/eicu/hospital.csv",low_memory=True,memory_map=True)
+#         vperiodic = pd.read_csv("../data/eicu/vitalPeriodic.csv",low_memory=True,memory_map=True)
+#         nursecharting = pd.read_csv('../data/eicu/nurseCharting.csv',low_memory=True,memory_map=True)
+#         physical = pd.read_csv('../data/eicu/physicalExam.csv',low_memory=True,memory_map=True)
+#     except (OSError, FileNotFoundError) as e:
+#         raise e("eICU data not found! Data must be acquired separately and placed in the 'data/eicu' directory.")
         
         
 
     # Filter to rows with BP
+#     print('loading physical...')
+    physical = loadcsv('../data/eicu/physicalExam.csv')
     bp_phys_inds = np.char.find(np.char.lower(physical['physicalexampath'].values.astype('unicode')),'vital sign and physiological data/bp')>0
-    bp_physical = physical.iloc[bp_phys_inds]
+    bp_physical = physical.iloc[bp_phys_inds].copy()
+    del physical
 
     # Filter to rows with BP
+#     print('loading nursing...')
+    nursecharting = loadcsv('../data/eicu/nurseCharting.csv')
     bp_nurse_inds = np.char.find(nursecharting['nursingchartcelltypevalname'].values.astype('unicode'),'BP')>0
-    bp_nursecharting = nursecharting.iloc[bp_nurse_inds]
+    bp_nursecharting = nursecharting.iloc[bp_nurse_inds].copy()
+    del nursecharting
 
     # Group real-time vitals by patient ID
+#     print('loading periodic...')
     vitals = defaultdict(list)
-    for ptid, offset, syst, mean, diast in (vperiodic[['patientunitstayid','observationoffset','systemicsystolic','systemicmean','systemicdiastolic']].values):
-        vitals[ptid].append((offset,syst,mean,diast))
+    with open('../data/eicu/vitalPeriodic.csv','r') as f:
+        header = f.readline().strip().split(',')
+        for line in f:
+            row = line.strip().split(',')
+            ptid,offset,syst,mean,diast = [(row[i]) for i in [1,2,9,10,11]]
+            syst, mean, diast = [float('nan') if i=='' else int(i) for i in [syst,mean,diast]]
+            if not np.isnan(syst) or not np.isnan(mean) or not np.isnan(diast):
+                vitals[ptid].append((offset,syst,mean,diast))
+#     vperiodic = loadcsv('../data/eicu/vitalPeriodic.csv')
+#     for ptid, offset, syst, mean, diast in (vperiodic[['patientunitstayid','observationoffset','systemicsystolic','systemicmean','systemicdiastolic']].values):
+#         vitals[ptid].append((offset,syst,mean,diast))
+#     del vperiodic
 
     # Physical exam vitals
+#     print('processing...')
     physvitals = {k: defaultdict(list) for k in bp_physical['physicalexamvalue'].unique()}
     for ptid, offset, vtype, val in (bp_physical[['patientunitstayid','physicalexamoffset','physicalexamvalue','physicalexamtext']].values):
         physvitals[vtype][ptid].append((offset,val))
@@ -72,6 +94,7 @@ def generate_bp():
                 all_vitals[k][ptid].append((offset,v))
 
     # Get qSOFA values
+    apsvar = loadcsv('../data/eicu/apacheApsVar.csv')
     qsofa_syst = np.zeros(apsvar.shape[0])
     qsofa_syst *= np.nan
     for i, ptid in (enumerate(apsvar['patientunitstayid'].values)):
