@@ -76,12 +76,16 @@ class DynamicOptimizer(CostAwareOptimizer):
 
     def feats_costs(self,feats):
         return np.sum(self.feature_costs[feats])
-
-    def intermediate_cost_models(self,X,y,add_to_model=False):
+    
+    def calculate_global_importances(self,X):
         explainer = self.base_explainer(self.full_model,X)
         shap_values = explainer.shap_values(X)
         global_importances = np.sum(np.abs(shap_values),axis=0)
         self.global_importances = global_importances
+        return global_importances
+
+    def intermediate_cost_models(self,X,y,add_to_model=False):
+        global_importances = self.calculate_global_importances(X)
         tfeats, tcosts, tmodels = [], [], []
         for t in iterator(self.thresholds):
             opt_feats = self.feats_at_thresh(global_importances,t)
@@ -219,6 +223,28 @@ class GroupOptimizer(DynamicOptimizer):
 
 class CoAIOptimizer(GroupOptimizer):
     pass
+
+# class FixedCostOptimizer(GroupOptimizer):
+#     """
+#     Cost-aware model optimization with a knapsack, adapted for Sklearn API.
+    
+#     Fixed to one cost so we don't have a range of models in one object.
+#     Can be sped up by precomputing feature importances.
+#     """
+#     def __init__(self,threshold,model,explainer=None,importances=None,scale_ints=None,**kwargs):
+#         if importances is not None:
+#             self.global_importances = importances
+#         self.model = type(model)(**kwargs)
+#         self.fixed_cost = threshold
+#         super().__init__(model,explainer,**kwargs)
+#     def fit(self,X,y,feature_costs=None,feature_groups=None,thresholds=None,cost_criterion=None,**kwargs):
+#         super().fit(X,y,feature_costs,feature_groups,thresholds=[self.fixed_cost],cost_criterion=None,**kwargs)
+#     def predict(self,X,max_cost=None):
+#         return super().predict(X,max_cost=self.fixed_cost)
+#     def predict_proba(self,X,max_cost=None):
+#         return super().predict_proba(X,max_cost=self.fixed_cost)
+#     def set_params(self,**params):
+#         self.model.set_params(**params)
 
         
             

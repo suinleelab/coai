@@ -20,7 +20,7 @@ class OneDimExplainer(shap.TreeExplainer):
             shaps = shaps[-1]
         return shaps
 
-class CostAwareModel(object):
+class CostAwareModel():
     def __init__(self,base_model,base_explainer=shap.SamplingExplainer,max_cost=np.inf,explainer_params={},global_importances=None):
         self.base_model = base_model
         self.base_explainer = base_explainer

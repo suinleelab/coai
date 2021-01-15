@@ -88,5 +88,5 @@ def generate_bp():
     qsofa_data = qsofa_data.T
 
     # Cache
-    np.save('qsofa_bp.npy',qsofa_data)
+    np.save(BP_PATH,qsofa_data)
     return qsofa_data
