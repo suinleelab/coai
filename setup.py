@@ -18,5 +18,5 @@ setuptools.setup(
          "Intended Audience :: Science/Research",
          "Topic :: Scientific/Engineering"
      ],
-    install_requires=['numpy', 'shap', 'tqdm', 'sklearn', 'ortools', 'dill'],  
+    install_requires=['numpy', 'shap', 'tqdm', 'sklearn', 'ortools', 'lightgbm', 'dill'],  
  )

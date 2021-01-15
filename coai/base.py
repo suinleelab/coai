@@ -4,7 +4,6 @@ import shap
 import numpy as np
 import pandas as pd
 import dill
-import xgboost as xgb
 from .utils import iterator, pmap_progress
 
 def load_model(fname):
