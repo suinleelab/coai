@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-import shap, pdb
+import shap, pdb, warnings
 from .base import CostAwareOptimizer
 import numpy as np
 import pandas as pd
@@ -74,8 +74,8 @@ class DynamicOptimizer(CostAwareOptimizer):
                 self.rescale_ints(self.feature_costs),
                 thresh*self.scale_ints)
 
-    def feats_costs(self,feats):
-        return np.sum(self.feature_costs[feats])
+#     def feats_costs(self,feats):
+#         return np.sum(self.feature_costs[feats])
     
     def calculate_global_importances(self,X):
         explainer = self.base_explainer(self.full_model,X)
@@ -207,19 +207,27 @@ class GroupOptimizer(DynamicOptimizer):
         opt_feats = np.array([i for i in np.arange(self.feature_groups.shape[0]) if groups[i] in opt_groups],dtype=int)
         return opt_feats
 
-    def feats_costs(self,feats):
-        groups = self.feature_groups
-        unique_groups = self.unique_groups
-        costs = self.feature_costs
-        grouped_costs = {u:np.mean(self.feature_costs[groups==u]) for u in unique_groups}
+#     def feats_costs(self,feats,costs=None):
+#         if costs is None: costs = self.feature_costs
+#         groups = self.feature_groups
+#         unique_groups = self.unique_groups
+# #         costs = self.feature_costs
+#         grouped_costs = {u:np.mean(costs[groups==u]) for u in unique_groups}
 
-        groups_present = np.unique(groups[feats])
-        return np.sum([grouped_costs[g] for g in groups_present])
+#         groups_present = np.unique(groups[feats])
+#         return np.sum([grouped_costs[g] for g in groups_present])
 
     def full_cost_model(self,X,y,add_to_model=False):
         model, cost, features = super().full_cost_model(X,y,add_to_model=False)
         newcost = self.feats_costs(features)
         return (model, newcost, features)
+    
+#     def recalculate_costs(self,costs):
+#         new_costs = np.array([self.feats_costs(f,costs) for f in self.model_features])
+#         inds = np.argsort(new_costs)
+#         self.models = [self.models[i] for i in inds]
+#         self.model_costs = new_costs[inds]
+#         if self.model_scores is not None: self.model_scores = self.model_scores[inds]
 
 class CoAIOptimizer(GroupOptimizer):
     pass
@@ -329,11 +337,58 @@ class FixedModelExactRetainer(DynamicOptimizer):
 
     def full_cost_model(self,X,y,add_to_model=False):
         return self.base_model, np.sum(self.feature_costs), np.arange(X.shape[1])
+    
+    def calculate_global_importances(self,X):
+        return super().calculate_global_importances(X) if self.global_importances is None else self.global_importances
 
     def intermediate_cost_models(self,X,y,add_to_model=False):
-        explainer = self.base_explainer(self.full_model,X)
-        shap_values = explainer.shap_values(X)
-        global_importances = np.sum(np.abs(shap_values),axis=0)
+        global_importances = self.calculate_global_importances(X)
+        tfeats, tcosts, tmodels = [], [], []
+        for t in iterator(self.thresholds):
+            opt_feats = knapsolve(
+                self.rescale_ints(global_importances),
+                self.rescale_ints(self.feature_costs),
+                t*self.scale_ints)
+            tfeats.append(opt_feats)
+            tcosts.append(np.sum(self.feature_costs[tfeats[-1]]))
+            tmodels.append(self.base_model)
+            # self.fitmodel(tmodels[-1],self.selectfeats(X,tfeats[-1]),y)
+        if add_to_model:
+            self.models.extend(tmodels[:-1])
+            self.model_costs.extend(tcosts[:-1])
+            self.model_features.extend(tfeats[:-1])
+    def fit(self,X,y,feature_costs=None,thresholds=None,cost_criterion=None,**kwargs):
+        if self.global_importances is not None:
+            warnings.warn("Model has already been fit! Overwriting global importances")
+            self.global_importances = None
+        super().fit(X,y,feature_costs,thresholds,cost_criterion,**kwargs)
+    def refit(self,X,y,costs,thresholds=None,cost_criterion=None,**kwargs):
+        if thresholds is None: thresholds = self.thresholds
+        self.models = []
+        self.model_costs = []
+        self.model_features = []
+        assert self.global_importances is not None, "refit method requires model to have already been fit at least once!"
+        super().fit(X,y,costs,thresholds,cost_criterion,**kwargs)
+
+class FixedModelImputer(FixedModelExactRetainer):
+    def __init__(self, model, explainer, imputer, scale_ints=None):
+        self.impute_model = imputer
+        super().__init__(model,explainer,scale_ints)
+    
+    def selectfeats(self,arr,feats):
+        zerofeats = [i for i in range(arr.shape[1]) if i not in feats]
+        X = arr.copy()
+        if type(X) is pd.core.frame.DataFrame: X.iloc[:,zerofeats]=np.nan
+        else: X[:,zerofeats]=np.nan
+#         X[:,feats]=np.nan
+        X_imp = self.impute_model.transform(X)
+        return X_imp
+
+    def full_cost_model(self,X,y,add_to_model=False):
+        return self.base_model, np.sum(self.feature_costs), np.arange(X.shape[1])
+
+    def intermediate_cost_models(self,X,y,add_to_model=False):
+        global_importances = self.calculate_global_importances(X)
         tfeats, tcosts, tmodels = [], [], []
         for t in iterator(self.thresholds):
             opt_feats = knapsolve(

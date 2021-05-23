@@ -214,6 +214,15 @@ class CostAwareOptimizer(object):
     def score_models_proba(self,Xtest,ytest,scorefunc):
         self.model_scores = np.array([scorefunc(ytest,self.predict_proba(Xtest,max_cost=c)[:,1]) 
                for c in self.model_costs])
+        
+    # Reset model_costs with new feature cost vector
+    def recalculate_costs(self,costs,groups=None):
+        new_costs = np.array([self.feats_costs(m,costs,groups) for m in self.model_features])
+        inds = np.argsort(new_costs)
+        self.model_costs = new_costs[inds]
+        self.models = [self.models[i] for i in inds]
+        self.model_features = [self.model_features[i] for i in inds]
+        if self.model_scores is not None: self.model_scores = self.model_scores[inds]
 
     # Feature attributions
     def explain_models(self,indiv=False):
@@ -267,3 +276,15 @@ class CostAwareOptimizer(object):
 
     def cost_at_perf(model,perf):
         return np.min(model.model_costs[model.model_scores>=perf])
+
+    def feats_costs(self,feats,costs=None,groups=None):
+        if costs is None: costs = self.feature_costs
+        if groups is None: 
+            groups = self.feature_groups if hasattr(self,'feature_groups') else np.arange(costs.shape[0])
+#         groups = self.feature_groups
+        unique_groups = np.unique(groups)#self.unique_groups
+#         costs = self.feature_costs
+        grouped_costs = {u:np.mean(costs[groups==u]) for u in unique_groups}
+
+        groups_present = np.unique(groups[feats])
+        return np.sum([grouped_costs[g] for g in groups_present])

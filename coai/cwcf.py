@@ -18,6 +18,8 @@ DEFAULT_PARAMS = {
     'difficulty': 1000
 }
 
+CWCF_FIXED_PATH = '/'.join(__file__.split('/')[:-2])
+
 def get_preds_labels(df):
     y,c,d = df['y'].values, df['correct'].values, df['done'].values
 #     stop_idx = np.where(y<0)[0][0]
@@ -32,15 +34,15 @@ def get_probs(outputs,qs):
     return softmax(qs[done,:2],axis=1)
 
 class CWCFClassifier(object):
-    def __init__(self,lmbd=1.0,name='coai',costs=None,**kwargs):
+    def __init__(self,lmbd=1.0,name='coai',costs=None,dirname=None,**kwargs):
         self.lmbd = lmbd
         self.costs = costs
         self.name = name
         self.params = DEFAULT_PARAMS.copy()
         for k,v in kwargs.items():
             self.params[k]=v
-        self.tmpdir = tempfile.TemporaryDirectory()
-        shutil.copytree('../cwcf_fixed',self.tmpdir.name+'/cwcf')
+        self.tmpdir = tempfile.TemporaryDirectory(dir=dirname)
+        shutil.copytree(f'{CWCF_FIXED_PATH}/cwcf_fixed',self.tmpdir.name+'/cwcf')
             
     def fit(self,Xtrain,Xvalid,Xtest,ytrain,yvalid,ytest):
         # Default feature cost is 1
