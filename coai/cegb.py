@@ -30,7 +30,7 @@ class CEGBOptimizer(CostAwareOptimizer):
     def intermediate_cost_models(self,X,y,add_to_model=False):
         tfeats, tcosts, tmodels = [], [], []
         for lmbd in iterator(self.lambdas[::-1]):
-            newparams = {'cegb_penalty_feature_coupled':self.feature_costs,'cegb_tradeoff':lmbd}
+            newparams = {'cegb_penalty_feature_coupled':self.feature_costs,'cegb_tradeoff':lmbd,'cegb_feature_groups':self.groups}
             model = self.newmodel(newparams)
             self.fitmodel(model,X,y)
             tmodels.append(model)
@@ -40,4 +40,7 @@ class CEGBOptimizer(CostAwareOptimizer):
             self.models.extend(tmodels)
             self.model_costs.extend(tcosts)
             self.model_features.extend(tfeats)
-    
+    def fit(self,X,y,costs,groups=None):
+        if groups is None: groups = np.arange(costs.shape[0])
+        self.groups = groups
+        super().fit(X,y,costs)

@@ -38,7 +38,7 @@ class DynamicOptimizer(CostAwareOptimizer):
     cost. This corresponds exactly to a knapsack problem and can be solved 
     efficiently so long as costs and importances have reasonable precision.
     """
-    def __init__(self, model, explainer, scale_ints=None):
+    def __init__(self, model, explainer, scale_ints=None, explainer_params={}):
         """
         Initialize with base model type and explainer type.
         
@@ -64,6 +64,7 @@ class DynamicOptimizer(CostAwareOptimizer):
         self.scale_ints = scale_ints
         self.thresholds = None
         self.global_importances = None
+        self.explainer_params = explainer_params
 
     def rescale_ints(self,arr):
         return (arr*self.scale_ints).astype(int)
@@ -77,15 +78,16 @@ class DynamicOptimizer(CostAwareOptimizer):
 #     def feats_costs(self,feats):
 #         return np.sum(self.feature_costs[feats])
     
-    def calculate_global_importances(self,X):
-        explainer = self.base_explainer(self.full_model,X)
-        shap_values = explainer.shap_values(X)
-        global_importances = np.sum(np.abs(shap_values),axis=0)
+    def calculate_global_importances(self,X,y):
+        reduction = self.explainer_params.pop('reduction') if 'reduction' in self.explainer_params else lambda x: np.sum(np.abs(x),axis=0)
+        explainer = self.base_explainer(self.full_model,X,**self.explainer_params)
+        shap_values = explainer.shap_values(X,y)
+        global_importances = reduction(shap_values)
         self.global_importances = global_importances
         return global_importances
 
     def intermediate_cost_models(self,X,y,add_to_model=False):
-        global_importances = self.calculate_global_importances(X)
+        global_importances = self.calculate_global_importances(X,y)
         tfeats, tcosts, tmodels = [], [], []
         for t in iterator(self.thresholds):
             opt_feats = self.feats_at_thresh(global_importances,t)
@@ -259,7 +261,7 @@ class CoAIOptimizer(GroupOptimizer):
 class GreedyOptimizer(CostAwareOptimizer):
     def intermediate_cost_models(self,X,y,add_to_model=False):
         explainer = self.base_explainer(self.full_model,X)
-        shap_values = explainer.shap_values(X)
+        shap_values = explainer.shap_values(X,y)
         global_importances = np.sum(np.abs(shap_values),axis=0)
         gains = global_importances/self.feature_costs
         order = np.argsort(gains)[::-1]
@@ -275,7 +277,95 @@ class GreedyOptimizer(CostAwareOptimizer):
         if add_to_model:
             self.models.extend(tmodels[:-1])
             self.model_costs.extend(tcosts[:-1])
-            self.model_features.extend(tfeats[:-1])
+            self.model_features.extend(tfeats[:-1])      
+
+class GroupGreedy(GreedyOptimizer):
+    
+    def fit(self,X,y,feature_costs=None,feature_groups=None,thresholds=None,cost_criterion=None,**kwargs):
+        """
+        Fit to data and feature costs.
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            A data matrix containing predictors. 
+            Compatibility with Pandas not yet guaranteed.
+            
+        y : np.ndarray
+            A vector containing labels.
+            
+        feature_costs : np.ndarray, default None
+            A vector of length X.shape[1], containing the numeric
+            cost associated with each feature.
+            
+            If None, set to equal costs (1) for each feature.
+            
+        feature_groups : np.ndarray, default None
+            A vector of length X.shape[1] with dtype int. Each entry is the
+            group each feature belongs to; groups of features are acquired all
+            at once with a single cost.
+            
+            If None, set to distinct groups for every feature.
+        
+        thresholds : np.ndarray, default None
+            A vector of arbitrary length containing the cost budgets to fit
+            models at. While predictions can be made within any budget after
+            fitting, best performance occurs if the budget is in this array.
+            
+            If None, set to range from 0 to the sum of feature costs, with 
+            step size = min(feature_costs).
+            
+        cost_criterion : function
+            Deprecated.
+            
+        kwargs : dictionary
+            Keyword arguments passed to the base model fit function.
+        """
+        if feature_groups is None:
+            feature_groups = np.arange(X.shape[1])
+        self.feature_groups = feature_groups
+        self.unique_groups = np.unique(feature_groups)
+        super().fit(X,y,feature_costs=feature_costs,cost_criterion=cost_criterion,**kwargs)
+    
+    #  Not done
+    def intermediate_cost_models(self,X,y,add_to_model=False):
+        explainer = self.base_explainer(self.full_model,X)
+        shap_values = explainer.shap_values(X,y)
+        imps = global_importances = np.sum(np.abs(shap_values),axis=0)
+        
+        groups = self.feature_groups
+        unique_groups = self.unique_groups
+        costs = self.feature_costs
+
+        grouped_imps = np.array([np.sum(imps[groups==u]) for u in unique_groups])
+        grouped_costs = np.array([np.mean(costs[groups==u]) for u in unique_groups])
+        grouped_utilities = grouped_imps/grouped_costs
+        group_order = unique_groups[np.argsort(grouped_utilities)[::-1]]
+        
+        tfeats, tcosts, tmodels = [], [], []
+        for i in iterator(range(1,len(group_order)+1)):
+            newgroups = sorted(group_order[:i])
+            newcost = np.sum(grouped_costs[newgroups])
+            newfeats = np.array([f for f in np.arange(X.shape[1]) if groups[f] in newgroups])
+            if len(newfeats)==0 or not self.cost_criterion(newcost): continue
+            tfeats.append(newfeats)
+            tcosts.append(newcost)
+            tmodels.append(self.newmodel())
+            self.fitmodel(tmodels[-1],self.selectfeats(X,tfeats[-1]),y)
+        if add_to_model:
+            self.models.extend(tmodels[:-1])
+            self.model_costs.extend(tcosts[:-1])
+            self.model_features.extend(tfeats[:-1])  
+
+    def full_cost_model(self,X,y,add_to_model=False):
+        model, cost, features = super().full_cost_model(X,y,add_to_model=False)
+        groups = self.feature_groups
+        unique_groups = self.unique_groups
+        costs = self.feature_costs
+        grouped_costs = np.array([np.mean(costs[groups==u]) for u in unique_groups])
+        newcost = np.sum(grouped_costs)
+        return (model, newcost, features)
+            
             
 class IncreasingCostOptimizer(CostAwareOptimizer):
     def intermediate_cost_models(self,X,y,add_to_model=False):
@@ -297,7 +387,7 @@ class IncreasingCostOptimizer(CostAwareOptimizer):
 class DecreasingImportanceOptimizer(CostAwareOptimizer):
     def intermediate_cost_models(self,X,y,add_to_model=False):
         explainer = self.base_explainer(self.full_model,X)
-        shap_values = explainer.shap_values(X)
+        shap_values = explainer.shap_values(X,y)
         global_importances = np.sum(np.abs(shap_values),axis=0)
         gains = global_importances
         order = np.argsort(gains)[::-1]
@@ -338,11 +428,11 @@ class FixedModelExactRetainer(DynamicOptimizer):
     def full_cost_model(self,X,y,add_to_model=False):
         return self.base_model, np.sum(self.feature_costs), np.arange(X.shape[1])
     
-    def calculate_global_importances(self,X):
-        return super().calculate_global_importances(X) if self.global_importances is None else self.global_importances
+    def calculate_global_importances(self,X,y):
+        return super().calculate_global_importances(X,y) if self.global_importances is None else self.global_importances
 
     def intermediate_cost_models(self,X,y,add_to_model=False):
-        global_importances = self.calculate_global_importances(X)
+        global_importances = self.calculate_global_importances(X,y)
         tfeats, tcosts, tmodels = [], [], []
         for t in iterator(self.thresholds):
             opt_feats = knapsolve(
@@ -388,7 +478,7 @@ class FixedModelImputer(FixedModelExactRetainer):
         return self.base_model, np.sum(self.feature_costs), np.arange(X.shape[1])
 
     def intermediate_cost_models(self,X,y,add_to_model=False):
-        global_importances = self.calculate_global_importances(X)
+        global_importances = self.calculate_global_importances(X,y)
         tfeats, tcosts, tmodels = [], [], []
         for t in iterator(self.thresholds):
             opt_feats = knapsolve(
@@ -425,7 +515,7 @@ class FixedModelGreedyRetainer(CostAwareOptimizer):
 
     def intermediate_cost_models(self,X,y,add_to_model=False):
         explainer = self.base_explainer(self.full_model,X)
-        shap_values = explainer.shap_values(X)
+        shap_values = explainer.shap_values(X,y)
         global_importances = np.sum(np.abs(shap_values),axis=0)
         gains = global_importances/self.feature_costs
         order = np.argsort(gains)[::-1]
