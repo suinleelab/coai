@@ -34,10 +34,6 @@ def train(rseed):
     
     strain, svalid, stest = [s['apacheiva'].values for s in aps_baselines(split_seed=rseed)]#[extras['apacheiva'][k] for k in ['train','valid','test']]
     
-#     Xtrain, ytrain, strain = bootstrap_set(Xtrain,ytrain,strain,rseed=rseed)
-#     Xvalid, yvalid, svalid = bootstrap_set(Xvalid,yvalid,svalid,rseed=rseed)
-#     Xtest, ytest, stest = bootstrap_set(Xtest,ytest,stest,rseed=rseed)
-    
     Xtv = pd.concat([Xtrain,Xvalid])
     ytv = np.hstack((ytrain,yvalid))
     stv = np.hstack((strain,svalid))

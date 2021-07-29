@@ -61,6 +61,5 @@ broken_cdict = {'red':   [[0.0,  0.8, 0.8],
          'blue':  [[0.0,  1.0, 1.0],
                    [0.5,  1.0, 1.0],
                    [1.0,  0.0, 0.0]]}
-# newcmp = colors.LinearSegmentedColormap('testCmap', segmentdata=cdict, N=256)
 cb_cmp = colors.LinearSegmentedColormap('testCmap', segmentdata=cb_dict, N=256)
 cb_cmp.set_under('white')

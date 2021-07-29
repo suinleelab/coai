@@ -44,7 +44,7 @@ def qsofa_score(split_seed=None):
     qtrain['verbal'] = Xtv[['verbal','motor','eyes']].sum(1)<15
     qtrain['respiratoryrate'] = qtrain['respiratoryrate']>=22
     qtrain[invtrain]=0
-    qtrain['meanbp'] = qbp_train#qtrain['meanbp']<=73.33
+    qtrain['meanbp'] = qbp_train
     qtrain.columns = ['gcs','respiratoryrate','meanbp']
 
     qtest = Xtest[['verbal','respiratoryrate','meanbp']].copy()
@@ -52,7 +52,7 @@ def qsofa_score(split_seed=None):
     qtest['verbal'] = Xtest[['verbal','motor','eyes']].sum(1)<15
     qtest['respiratoryrate'] = qtest['respiratoryrate']>=22
     qtest[invtest]=0
-    qtest['meanbp'] = qbp_test#qtrain['meanbp']<=73.33  # This should be test?
+    qtest['meanbp'] = qbp_test
     qtest.columns = ['gcs','respiratoryrate','meanbp']
 
     imp = impute.SimpleImputer()
@@ -75,4 +75,4 @@ def qsofa_score(split_seed=None):
     qimps = qpd.values.flatten()
     qimps_binary = (qimps>0).astype(float)
     
-    return qtest.sum(1)#qtest_ss.sum(1)
+    return qtest.sum(1)

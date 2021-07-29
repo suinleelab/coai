@@ -142,9 +142,7 @@ def main():
     assert len(sys.argv)==3, "USAGE: python train_complexity.py MODEL SEED"
     mname = sys.argv[1]
     rseed = int(sys.argv[2])
-    
-#     assert mname in MTYPES.keys(), f"Valid model names are {list(MTYPES.keys())}"
-    
+        
     print(f'Running with dset trauma mtype {mname} seed {rseed}...')
     
     lmbds, costs, scores = train_complexity(mname,rseed)

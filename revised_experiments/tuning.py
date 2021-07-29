@@ -24,7 +24,6 @@ def bootstrap_set(*arrays,rseed=None):
     inds = np.arange(a.shape[0]) if rseed is None else state.choice(a.shape[0],size=a.shape[0],replace=True) 
     results = [sub_inds(arr,inds) for arr in arrays]
     return results[0] if len(results)==1 else results
-    #return (X.iloc[inds,:],y[inds]) if type(X)==pd.core.frame.DataFrame else (X[inds,:],y[inds])
 
 def get_linear_model(**kwargs):
     return pipeline.Pipeline([
@@ -100,7 +99,6 @@ def tune(Xtrain,Xvalid,ytrain,yvalid,mtype=MTYPE,predfunc=pred_1dprobs,scorefunc
             xg_bestimator = bst
             xg_best_score = cur_score
             xg_best_params = paramdict
-#     xg_best_params['n_estimators']=bst.booster_.best_iteration
     if not return_extras:
         return (xg_best_params,xg_best_score) if return_score else xg_best_params
     else:
@@ -120,7 +118,6 @@ def tftune(Xtrain,Xvalid,ytrain,yvalid,mfunc=get_tf_model,scorefunc=roc_auc_scor
     tf_results = {}
     
     params = TF_GRID.copy()
-#     params['base_score'] = [np.mean(ytrain)]
     
     tf_keys = params.keys()
     for vals in tqdm(itertools.product(*[params[k] for k in tf_keys])):
@@ -137,7 +134,6 @@ def tftune(Xtrain,Xvalid,ytrain,yvalid,mfunc=get_tf_model,scorefunc=roc_auc_scor
             tf_bestimator = model
             tf_best_score = cur_score
             tf_best_params = paramdict
-#     xg_best_params['n_estimators']=bst.booster_.best_iteration
     return ((tf_best_params,tf_best_score),tf_params_scores) if return_extras else tf_best_params
 
 
@@ -150,12 +146,10 @@ DEFAULT_TAB = dict( n_independent=2, n_shared=2,
     scheduler_params = {"gamma": 0.95,
                      "step_size": 20},
     scheduler_fn=torch.optim.lr_scheduler.StepLR, epsilon=1e-15, verbose=0)
-# TUNE_TAB = dict(n_d_a=[8],n_steps=[4],gamma=[1.3],lambda_sparse=[1e-3])
 TUNE_TAB = dict(n_d_a=[8,16,32,64],
                 n_steps=[2,4,6,8],
                 gamma=[1.1,1.3,1.5,1.7,1.9],
                 lambda_sparse=[1e-6,1e-4,1e-2,1e0,1e1])
-#np.logspace(-6,1,8))
 MAX_EPOCHS=1000
 
 def tabtune(Xtrain,Xvalid,ytrain,yvalid,
@@ -174,7 +168,6 @@ def tabtune(Xtrain,Xvalid,ytrain,yvalid,
     xg_results = {}
     
     params = TUNE_TAB.copy()
-#     params['base_score'] = [np.mean(ytrain)]
     
     xg_keys = params.keys()
     for vals in tqdm(list(itertools.product(*[params[k] for k in xg_keys]))):
@@ -201,12 +194,10 @@ def tabtune(Xtrain,Xvalid,ytrain,yvalid,
         return ((xg_best_params,xg_best_score),xg_params_scores)
 
     
-# TUNE_TAB = dict(n_d_a=[8],n_steps=[4],gamma=[1.3],lambda_sparse=[1e-3])
 TUNE_NODE = dict(num_trees=[512],
                 num_layers=[2,4,8],
                 depth=[6],
                 tree_dim=[2,3])
-#np.logspace(-6,1,8))
 MAX_EPOCHS=1000
 
 def nodetune(Xtrain,Xvalid,ytrain,yvalid,
@@ -223,7 +214,6 @@ def nodetune(Xtrain,Xvalid,ytrain,yvalid,
     xg_results = {}
     
     params = TUNE_NODE.copy()
-#     params['base_score'] = [np.mean(ytrain)]
     
     xg_keys = params.keys()
     for i,vals in tqdm(list(enumerate(itertools.product(*[params[k] for k in xg_keys])))):
@@ -239,7 +229,6 @@ def nodetune(Xtrain,Xvalid,ytrain,yvalid,
             xg_bestimator = bst
             xg_best_score = cur_score
             xg_best_params = paramdict
-#     xg_best_params['n_estimators']=bst.booster_.best_iteration
     if not return_extras:
         return (xg_best_params,xg_best_score) if return_score else xg_best_params
     else:

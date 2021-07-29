@@ -23,14 +23,6 @@ def load_outpatient(split_seed=100):
     X = pd.read_csv(DATADIR+"X_nhanes_binary.csv").drop(columns="Unnamed: 0")
     y = np.load(DATADIR+"y_nhanes_binary.npy")
     Xtrain_raw, Xtest_raw, ytrain, ytest = train_test_split(X,y,train_size=0.8,random_state=split_seed)
-#     imp = Imputer()
-#     ss = StandardScaler()
-#     Xtrain_imp = imp.fit_transform(Xtrain_raw)
-#     Xtest_imp = imp.transform(Xtest_raw)
-#     Xtrain_ss = ss.fit_transform(Xtrain_imp)
-#     Xtest_ss = ss.transform(Xtest_imp)
-#     Xtrain_ss = pd.DataFrame(data=Xtrain_ss,columns=Xtrain_raw.columns)
-#     Xtest_ss = pd.DataFrame(data=Xtest_ss,columns=Xtest_raw.columns)
     
     Xtt, Xtv, ytt, ytv = train_test_split(Xtrain_raw,ytrain,train_size=0.8,random_state=split_seed)
     
@@ -100,7 +92,6 @@ def load_outpatient(split_seed=100):
         nice_name = groupnames[feature_groups[f]]
         cost = feature_costs[f]
         cvec.loc[nice_name]=f'{cost:.2f}'
-#     print(cvec.to_latex())
 
     all_groups = {}
     for f in Xtrain_raw.columns:

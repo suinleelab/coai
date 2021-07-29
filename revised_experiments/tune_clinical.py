@@ -77,17 +77,6 @@ def icu_preprocessing(mfunc):
 def train(dname,mname,rseed, shuffle_params=None):
     assert (('gbm' in mname) or (mname in ('cegb','fixedmodel','imputemodel')) or ('linear' in mname) or ('nn' in mname) or ('tab' in mname) or ('node' in mname))
     
-#     mtype = MTYPES[mname]
-#     kwargs = {}
-#     if dname=='icu' and ('linear' in mname or 'nn' in mname or 'cwcf' in mname): kwargs['onehot']=True
-    
-    
-#     if mname=='cwcf' and 'CUDA_VISIBLE_DEVICES' not in os.environ:
-#         ngpu = len(tf.config.list_physical_devices('GPU'))
-#         cur_gpu = rseed%ngpu if rseed is not None else 0
-#         os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
-#         os.environ["CUDA_VISIBLE_DEVICES"]=str(cur_gpu)
-    
     ##################
     # DATA
     ##################
@@ -97,13 +86,6 @@ def train(dname,mname,rseed, shuffle_params=None):
     # If we're using PACT we need some of the extra (redundant) features that were unused in our study
     if mname=='pact': (Xtrain,ytrain), (Xvalid,yvalid), (Xtest,ytest), costs, groups, extras = load_ed(name=config.ED_NAME,costtype=config.ED_COSTTYPE,drop_redundant=False,split_seed=rseed)
     
-    
-#     Xtrain_raw,Xvalid_raw,Xtest_raw = Xtrain,Xvalid,Xtest
-    
-#     For bootstrapping
-#     Xtrain_raw, ytrain = bootstrap_set(Xtrain,ytrain,rseed=rseed)
-#     Xvalid_raw, yvalid = bootstrap_set(Xvalid,yvalid,rseed=rseed)
-#     Xtest_raw, ytest = bootstrap_set(Xtest,ytest,rseed=rseed)
     
     # If we're using a non-GBM AI method, we need to impute NaNs and scale
     # Don't do this if using ICU data because we're using a Pipeline in that case
@@ -198,8 +180,6 @@ def train(dname,mname,rseed, shuffle_params=None):
     
     # Get our explainer (using SAGE entirely now, shap is old & may not work perfectly)
     if ('sage' in mname) or (mname in ('cegb','fixedmodel','imputemodel')):
-        #sage_params={'imputetype':'default'}
-        #if 'gbm' in mname: sage_params={'imputetype':'marginal'}
         exp = labelless_sage_wrapper(imputetype='marginal',refsize=64,batch_size=32,wrap_categorical=(dname=='icu'))
     elif mname=='gbmshap':
         exp = OneDimExplainer
@@ -242,7 +222,6 @@ def train(dname,mname,rseed, shuffle_params=None):
         GRP.fit(Xtv,ytv,costs,dthresh)
         if shuffle_params: GRP.refit(Xtv,ytv,shuffle_costs)
         GRP.score_models_proba(Xtest,ytest,roc_auc_score)
-#     GRP.fit(Xtv,ytv,costs,groups,dthresh) if mname=='default' else GRP.fit(Xtv,ytv,costs,dthresh)
     elif mname=='cegb':
         GRP = cegb.CEGBOptimizer(model=bst,lambdas=np.logspace(-5,5,101))
         GRP.fit(Xtv,ytv,costs)
@@ -283,7 +262,7 @@ def train(dname,mname,rseed, shuffle_params=None):
     else: raise ValueError("Model name not found!")
         
     # Done    
-    return GRP#(GRP.model_costs, GRP.model_scores)
+    return GRP
     
 # Score models
 def train_costperf(dname,mname,rseed,shuffle_params):
@@ -309,7 +288,6 @@ def main():
     else: shuffle_params = None
     if rseed<0: rseed = None
     assert dname in VALID_DSETS, "Valid dataset names are (trauma, icu, outpatient)!"
-#     assert mname in MTYPES.keys(), f"Valid model names are {list(MTYPES.keys())}"
     
     print(f'Running with dset {dname} mtype {mname} seed {rseed} shuffle params {shuffle_params}...')
     
@@ -317,8 +295,6 @@ def main():
     stacked = np.vstack([costs,scores]).T
     np.save(f'{OUTPATH}/{dname}-{mname}-{rseed}-{shuffle_params}.npy',stacked)
     
-#     with open(f'{dname}-{mname}-{rseed}.coai','wb') as w:
-#         dill.dump(GRP,w)
 
 def test_cegb_error():
     costs, scores = train_costperf('trauma','cegb',92,None)

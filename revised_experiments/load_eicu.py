@@ -12,8 +12,6 @@ import itertools
 
 import config
 
-# np.random.seed(100)
-
 EPATH = config.EICU_DPATH
 FIXED_SEED = config.EICU_FIXED_SEED
 
@@ -49,8 +47,7 @@ def load_eicu(onehot=False, split_seed=None):
            'bedcount', 'admitsource', 'graftcount', 'age', 'admitdiagnosis','ventday1',
            'oobventday1', 'oobintubday1', 'diabetes',
            'ejectfx', 'visitnumber',
-           'amilocation']#, 'day1meds', 'day1verbal', 'day1motor', 'day1eyes',
-           #'day1pao2', 'day1fio2']  # These vars are redundant
+           'amilocation']
     predvars = all_data[predvar_cols]
 
     outcome = (all_data['actualhospitalmortality'].values=='EXPIRED').astype(int)
@@ -66,13 +63,6 @@ def load_eicu(onehot=False, split_seed=None):
     
     train_cut, val_cut = int(0.64*len(unique_hospitals)), int(0.8*len(unique_hospitals))
     hosp_train, hosp_valid, hosp_test = unique_shuf[:train_cut], unique_shuf[train_cut:val_cut], unique_shuf[val_cut:]
-#     Split based on region -- hard to do 100 random TT splits tho
-#     nhosp = unique_hospitals.shape[0]
-#     # hosp_train, hosp_valid, hosp_test = unique_shuf[:int(0.64*nhosp)],unique_shuf[int(0.64*nhosp):int(0.8*nhosp)],unique_shuf[int(0.8*nhosp):]
-#     hosp_tv = rand.permutation(hospitals['hospitalid'].iloc[np.isin(hospitals['region'].values,('Midwest','West','South'))].values)
-#     hosp_train = hosp_tv[:int(0.8*len(hosp_tv))]
-#     hosp_valid = hosp_tv[int(0.8*len(hosp_tv)):]
-#     hosp_test = hospitals['hospitalid'].iloc[np.isin(hospitals['region'].values,('Northeast'))].values
     train_inds = np.isin(pt_hospitals,hosp_train)
     valid_inds = np.isin(pt_hospitals,hosp_valid)
     test_inds = np.isin(pt_hospitals,hosp_test)
@@ -93,7 +83,6 @@ def load_eicu(onehot=False, split_seed=None):
     # Encode -1s as NaNs
     for df in (Xtrain,Xvalid,Xtest):
         df.replace(to_replace=-1,value=np.nan,inplace=True)
-#     if return_all: return (Xtrain,ytrain), (Xvalid,yvalid), (Xtest,ytest), np.ones(Xtrain.shape[1]), np.arange(Xtrain.shape[1]), 
 
     # Unit costs and per-column groups
     costs, groups = np.ones(Xtrain.shape[1]), np.arange(Xtrain.shape[1])
@@ -122,7 +111,4 @@ def aps_baselines(split_seed=None):
     strain,svalid,stest = [all_data.loc[d.index,['predictedhospitalmortality','apachescore','acutephysiologyscore']] for d in (Xtrain,Xvalid,Xtest)]
     for df in strain,svalid,stest:
         df.rename(columns = {'predictedhospitalmortality':'apacheiva','apachescore':'apacheiii','acutephysiologyscore':'aps'},inplace=True)
-#     apachepreds = all_data.loc[Xtest.index]['predictedhospitalmortality'].values
-#     apspreds = all_data.loc[Xtest.index]['acutephysiologyscore'].values
-#     apache3preds = all_data.loc[Xtest.index]['apachescore'].values
     return strain,svalid,stest#{'apacheiva': apachepreds, 'apacheiii': apache3preds, 'aps': apspreds}

@@ -40,8 +40,6 @@ def pact_score(Xtrain,Xvalid,Xtest,ytrain,yvalid,ytest,costs,verbose=False):
                  "gcs":np.sum(all_measurability[f'scenegcs{k}'] for k in ['eye','motor','verbal']),
                  "intub":all_measurability['intub'],
                 "cpr":all_measurability['cpr']}
-#     Xtrain = Xtrain_raw
-#     Xtest = Xtest_raw
 
     lr_pact = LogisticRegression()
     Xtrain_pact = pd.DataFrame()
